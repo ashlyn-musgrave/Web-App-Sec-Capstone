@@ -11,7 +11,7 @@ def test_invalid_token():
     assert check_token is None
 
 def test_token_preserves_username():
-    """verify that the JWT properly preserves a username"""
+    """verify that token properly preserves a username"""
     # generate a token
     token = generate_token(2, "Bob2")
 
@@ -29,11 +29,11 @@ def test_default_to_not_admin():
     assert payload["is_admin"] is False
 
 def test_if_jwt_expires():
-    """verify that the JWT contains an expiration claim """
+    """verify that token contains expiration claim"""
     # generate a token
     token = generate_token(1, "Adam1")
 
-    # verify if expiration claim is present (it isn't included in the original repo)
+    # verify if expiration claim is present (will fail by default until fix implemented)
     payload = verify_token(token)
     assert "exp" in payload
 
