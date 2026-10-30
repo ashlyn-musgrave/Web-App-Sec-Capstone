@@ -1,3 +1,4 @@
+import jwt
 import unittest
 from auth import generate_token, verify_token
 
@@ -57,20 +58,35 @@ class Test_Auth(unittest.TestCase):
         payload = verify_token(token)
         self.assertIs(payload["is_admin"], True)
 
+    def test_invalid_signature(self):
+        """verify that a token with incorrect key is rejected"""
+        # create a valid payload for a token
+        payload = {"user_id": 5, "username": "Edward5", "is_admin": False}
+
+        # try to create token with an invalid signature (will fail by default until fix implemented)
+        token = jwt.encode(payload, "INVALID_KEY", algorithm="HS256")
+        result = verify_token(token)
+
+        self.assertIsNone(result, "This will fail by default until a fix is implemented")
+
     def test_if_jwt_expires(self):
         """verify that token contains expiration claim"""
         # generate a token
-        token = generate_token(5, "Edward5")
+        token = generate_token(6, "Fiona6")
 
         # verify if expiration claim is present (will fail by default until fix implemented)
         payload = verify_token(token)
+
         self.assertIn("exp", payload, "This will fail by default until a fix is implemented")
 
     def test_token_has_issued_time(self):
         """verify that token contains a timestamp of when it was issued"""
         # generate a token
-        token = generate_token(6, "Fiona6")
+        token = generate_token(7, "Garfield7")
 
         # verify that token has an issued-at timestamp
         payload = verify_token(token)
         self.assertIn("iat", payload)
+
+if __name__ == "__main__":
+    unittest.main()
