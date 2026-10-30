@@ -1,39 +1,76 @@
-import jwt
+import unittest
 from auth import generate_token, verify_token
 
-def test_invalid_token():
-    """verify that an invalid token is rejected by the app"""
-    # create an invalid token
-    token = "not_a_token"
+class Test_Auth(unittest.TestCase):
 
-    # verify the token and return result
-    check_token = verify_token(token)
-    assert check_token is None
+    def test_empty_token(self):
+        """verify that an empty token is rejected by the app"""
+        # generate an empty token
+        token = ""
 
-def test_token_preserves_username():
-    """verify that token properly preserves a username"""
-    # generate a token
-    token = generate_token(2, "Bob2")
+        # verify that token is rejected
+        payload = verify_token(token)
+        self.assertIsNone(payload)
 
-    # verify that the username matches the generated token
-    payload = verify_token(token)
-    assert payload["username"] == "Bob2"
+    def test_invalid_token(self):
+        """verify that an invalid token is rejected by the app"""
+        # create an invalid token
+        token = "not_a_token"
 
-def test_default_to_not_admin():
-    """verify that a new token doesn't have admin priviledges"""
-    # generate token
-    token = generate_token(3, "Candace3")
+        # verify the token and return result
+        check_token = verify_token(token)
+        self.assertIsNone(check_token)
 
-    # verify that the token doesn't have admin priviledges
-    payload = verify_token(token)
-    assert payload["is_admin"] is False
+    def test_token_preserves_username(self):
+        """verify that token properly preserves a username"""
+        # generate a token
+        token = generate_token(1, "Adam1")
 
-def test_if_jwt_expires():
-    """verify that token contains expiration claim"""
-    # generate a token
-    token = generate_token(1, "Adam1")
+        # verify that the username matches the generated token
+        payload = verify_token(token)
+        self.assertEqual(payload["username"], "Adam1")
 
-    # verify if expiration claim is present (will fail by default until fix implemented)
-    payload = verify_token(token)
-    assert "exp" in payload
+    def test_token_preserves_userID(self):
+        """verify that token properly preserves userID"""
+        # generate a token
+        token = generate_token(2, "Bob2")
 
+        # verify user ID matches generated token
+        payload = verify_token(token)
+        self.assertEqual(payload["user_id"], 2)
+
+    def test_default_to_not_admin(self):
+        """verify that a new token doesn't have admin priviledges"""
+        # generate token
+        token = generate_token(3, "Candace3")
+
+        # verify that the token doesn't have admin priviledges
+        payload = verify_token(token)
+        self.assertIs(payload["is_admin"], False)
+
+    def test_admin_is_preserved(self):
+        """verify that admin privileges are preserved in a token"""
+        # generate a token
+        token = generate_token(4, "Don4", is_admin=True)
+
+        # verify that token has admin privileges
+        payload = verify_token(token)
+        self.assertIs(payload["is_admin"], True)
+
+    def test_if_jwt_expires(self):
+        """verify that token contains expiration claim"""
+        # generate a token
+        token = generate_token(5, "Edward5")
+
+        # verify if expiration claim is present (will fail by default until fix implemented)
+        payload = verify_token(token)
+        self.assertIn("exp", payload, "This will fail by default until a fix is implemented")
+
+    def test_token_has_issued_time(self):
+        """verify that token contains a timestamp of when it was issued"""
+        # generate a token
+        token = generate_token(6, "Fiona6")
+
+        # verify that token has an issued-at timestamp
+        payload = verify_token(token)
+        self.assertIn("iat", payload)
