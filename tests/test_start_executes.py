@@ -6,6 +6,8 @@ from pathlib import Path
 class test_start(unittest.TestCase):
 
     def test_start_is_executable(self):
+        """Verifies start.sh is executable"""
+
         # Create variable for root path
         project_root = Path(__file__).resolve().parent.parent
         # Create variable for start.sh file

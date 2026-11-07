@@ -5,6 +5,8 @@ from pathlib import Path
 class test_files_exist(unittest.TestCase):
 
     def test_required_files(self):
+        """Verifies required files exist"""
+
         # Create variable for root path
         project_root = Path(__file__).resolve().parent.parent
 
