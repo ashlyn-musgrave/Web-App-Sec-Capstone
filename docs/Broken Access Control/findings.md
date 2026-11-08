@@ -10,13 +10,8 @@ VulnBank endpoint: GET /api/v3/user/<user_id>
 
 Code Snip (lines 1465-1475): 
 
-@app.route('/api/v3/user/<int:user_id>', methods=['GET'])
-@token_required
-def api_v3_get_user(current_user, user_id):
-    user = execute_query(
-        "SELECT * FROM users WHERE id = %s",
-        (user_id,)
-    )
+<img width="654" height="250" alt="image" src="https://github.com/user-attachments/assets/304d4dc4-333b-4824-b4a8-2cef734a31c8" />
+
 
 Finding: Authenticated users can request another user's details without an apparent ownership check. Notice that @token_required verifies authentication, but the function doesn't compare the requested user_id against the authenticated user's ID or check whether the requester has administrative permission.
   
@@ -26,16 +21,8 @@ VulnBank endpoint: POST /register
 
 Code Snip (lines 351-360): 
 
-Build dynamic query based on user input fields
-Vulnerability: Mass Assignment possible here
-fields = ['username', 'password', 'account_number']
-values = [username, user_data.get('password'), account_number]
+<img width="484" height="212" alt="image" src="https://github.com/user-attachments/assets/2c4088a3-26c9-4be6-bbd7-b079b6ce1d71" />
 
-Include any additional parameters from user input
-for key, value in user_data.items():
-    if key not in ['username', 'password']:
-        fields.append(key)
-        values.append(value)
 
 Finding: Registration accepts additional user-controlled fields, potentially including is_admin. The application builds a database insertion using additional fields supplied by the client. That potentially allows someone registering a normal account to influence fields they shouldn't control, including administrative privileges.
 
@@ -43,14 +30,18 @@ Finding: Registration accepts additional user-controlled fields, potentially inc
 
 VulnBank endpoint: POST /api/virtual-cards/<card_id>/toggle-freeze
 
-Code Snip: 
+Code Snip (lines 1804-1809): 
 
-UPDATE virtual_cards
-SET is_frozen = NOT is_frozen
-WHERE id = {card_id}
-RETURNING is_frozen
+<img width="299" height="118" alt="image" src="https://github.com/user-attachments/assets/96b78429-0dc2-4d28-b548-bf7a9d4e47e5" />
+
 
 Finding; The update uses the card ID without verifying ownership. The problem is that the query selects the card using only its ID. It does not include a condition requiring the card to belong to the authenticated user. As a result, a customer may be able to freeze or unfreeze another customer's virtual card.
+
+
+
+-----------------------------------
+
+
 
 #### BAC-04: Missing function-level access control 
 
