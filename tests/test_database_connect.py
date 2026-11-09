@@ -5,10 +5,12 @@ from database import init_connection_pool, get_connection
 class database_connection(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Initializes database connection
+        """Initializes database connection"""
         init_connection_pool()
 
     def test_database_connection(self):
+        """Verifies database connection is successful"""
+
         # Create variable for database connection status
         connection = get_connection()
 
