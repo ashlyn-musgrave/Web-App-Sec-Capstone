@@ -13,7 +13,7 @@ class TestAuthAttack(unittest.TestCase):
 
         # decode and inspect the valid token, verify not admin
         valid_payload = jwt.decode(valid_token, options={"verify_signature": False})
-        self.asserFalse(valid_payload["is_admin"])
+        self.assertFalse(valid_payload["is_admin"])
 
         # change the token to gain admin privileges
         forged_payload = valid_payload.copy()
