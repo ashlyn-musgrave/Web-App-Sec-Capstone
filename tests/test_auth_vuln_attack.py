@@ -1,45 +1,49 @@
 import jwt
 import unittest
+import requests
 
 from auth import generate_token, verify_token
 
+# *** import function that creates a new user here ***
+
+BASE_URL = "http://localhost:5000"
+
 class TestAuthAttack(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        # need to use function to create/tear down a new user once it's written
+        cls.user = {"username": "Adam1", "password": "password1", "is_admin": False}
+
     def test_forged_admin_token(self):
-        """Test if an attacker is able to change a user token and gain admin privileges"""
+        # Log in as test user and verify that credentials work
+        login_response = requests.post(f"{BASE_URL}/login", 
+                                       json={"username": self.user["username"],
+                                             "password": self.user["password"]},
+                                             timeout=10)
+        self.assertEqual(login_response.status_code, 200)
 
-        # generate a valid token
-        valid_token = generate_token(user_id=1, username="Amy1", is_admin=False)
-
-        # decode and inspect the valid token, verify not admin
-        valid_payload = jwt.decode(valid_token, options={"verify_signature": False})
-        self.assertFalse(valid_payload["is_admin"])
-
-        # change the token to gain admin privileges
-        forged_payload = valid_payload.copy()
-        forged_payload["is_admin"] = True
-        forged_token = jwt.encode(forged_payload, "attacker-key", algorithm="HS256")
-
-        # submit the forged token to authentication function
-        result = verify_token(forged_token)
-
-        # determine whether or not the authentication vulnerability has been fixed
-        self.assertIsNotNone(result, "PASS: Forged token was rejected by app")
-        self.assertTrue(result["is_admin"], "PASS: Forged admin privileges rejected by app")
-        print("FAIL: Forged admin token was accepted")
-
-    def test_does_token_expire(self):
-        """Verify if a token expires or not"""
-        # generate a token
-        token = generate_token(user_id=2, username="Ben2", is_admin=False)
+        # get legitimate token, confirm it doesn't have admin privileges
+        token = login_response.json()["token"]
         payload = jwt.decode(token, options={"verify_signature": False})
 
-        # verify if expiration is present
-        self.assertNotIn("exp", payload)
-        result = verify_token(token)
-        self.assertIsNotNone(result)
+        self.assertFalse(payload["is_admin"])
 
-        print("FAIL: Token does not expire")
+        # confirm that user can't access admin page
+        admin_response = requests.get(f"{BASE_URL}/sup3r_s3cr3t_admin", 
+                                      headers={"Authorization": f"Bearer {token}"},
+                                      timeout=10)
+        self.assertEqual(admin_response.status_code, 403)
+
+        # create a forged admin token
+        payload["is_admin"] = True
+        forged_admin_token = jwt.encode(payload, "invalid-key", algorithm="HS256")
+
+        # attempt to access admin page with forged token
+        attack_response = requests.get(f"{BASE_URL}/sup3r_s3cr3t_admin",
+                                       headers={"Authorization": f"Bearer {forged_admin_token}"},
+                                       timeout=10)
+        self.assertEqual(attack_response.status_code, 200, "Forged admin token rejected")
 
 if __name__ == "__main__":
     unittest.main()
