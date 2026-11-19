@@ -1,10 +1,9 @@
+import os
 import jwt
 import unittest
 import requests
 
-from auth import generate_token, verify_token
-
-# *** import function that creates a new user here ***
+from test_accounts import create_test_account, delete_test_account
 
 BASE_URL = "http://localhost:5000"
 
@@ -12,8 +11,10 @@ class TestAuthAttack(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # need to use function to create/tear down a new user once it's written
-        cls.user = {"username": "Adam1", "password": "password1", "is_admin": False}
+        cls.user = create_test_account()
+
+    def tearDownClass(cls):
+        delete_test_account(cls.user)
 
     def test_forged_admin_token(self):
         # Log in as test user and verify that credentials work
@@ -21,6 +22,7 @@ class TestAuthAttack(unittest.TestCase):
                                        json={"username": self.user["username"],
                                              "password": self.user["password"]},
                                              timeout=10)
+        
         self.assertEqual(login_response.status_code, 200)
 
         # get legitimate token, confirm it doesn't have admin privileges
@@ -33,6 +35,7 @@ class TestAuthAttack(unittest.TestCase):
         admin_response = requests.get(f"{BASE_URL}/sup3r_s3cr3t_admin", 
                                       headers={"Authorization": f"Bearer {token}"},
                                       timeout=10)
+        
         self.assertEqual(admin_response.status_code, 403)
 
         # create a forged admin token
