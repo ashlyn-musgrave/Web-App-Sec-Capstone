@@ -2,6 +2,14 @@ import os
 import unittest
 import requests
 from urllib.parse import quote
+from tests.helpers.test_accounts import (
+    create_test_accounts,
+    delete_test_accounts
+)
+from tests.helpers.test_transactions import(
+    create_test_transactions,
+    delete_test_transactions
+)
 
 BASE_URL = "http://localhost:5000"
 
@@ -9,18 +17,37 @@ BASE_URL = "http://localhost:5000"
 class TestSQLInjection(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        """Loads required test account information from environment variables.
-        Skips if required information is not available.
+        """Creates required test account information with helper functions.
+        Skips if required information is not created successfully.
         """
 
-        cls.username = os.getenv("TEST_USERNAME")
-        cls.password = os.getenv("TEST_PASSWORD")
-        cls.account_number = os.getenv("TEST_ACCOUNT_NUMBER")
+        # Create test account
+        cls.accounts = create_test_accounts(1)
+        cls.transaction_ids = []
+
+        cls.username = cls.accounts[0]["username"]
+        cls.password = cls.accounts[0]["password"]
+        cls.account_number = cls.accounts[0]["account_number"]
 
         if not all([cls.username, cls.password, cls.account_number]):
             raise unittest.SkipTest(
                 "TEST_USERNAME, TEST_PASSWORD, and TEST_ACCOUNT_NUMBER must be set"
             )
+
+        # Creates a list variable for account_number
+        cls.account_numbers = [cls.account_number]
+
+        # Create test transactions for test account
+        cls.transaction_ids = create_test_transactions(cls.account_numbers)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        """Delete test accounts and transactions after testing is complete"""
+
+        if cls.transaction_ids:
+            delete_test_transactions(cls.account_numbers)
+        if hasattr(cls, "accounts"):
+            delete_test_accounts(cls.accounts)
 
     def test_normal_login(self):
         """Verifies legitimate credentials are successful"""
