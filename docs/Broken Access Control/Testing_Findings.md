@@ -1,4 +1,4 @@
-* Record of Testing Findings
+# Record of Testing Findings
 
 BAC-01: Insecure Direct Object Reference (IDOR)
 
