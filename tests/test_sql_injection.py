@@ -2,11 +2,12 @@ import os
 import unittest
 import requests
 from urllib.parse import quote
+from auth import generate_token
 from tests.helpers.test_accounts import (
     create_test_accounts,
     delete_test_accounts
 )
-from tests.helpers.test_transactions import(
+from tests.helpers.test_transactions import (
     create_test_transactions,
     delete_test_transactions
 )
@@ -28,6 +29,15 @@ class TestSQLInjection(unittest.TestCase):
         cls.username = cls.accounts[0]["username"]
         cls.password = cls.accounts[0]["password"]
         cls.account_number = cls.accounts[0]["account_number"]
+
+        cls.token = generate_token(
+            cls.accounts[0]["id"],
+            cls.username
+        )
+
+        cls.headers = {
+            "Authorization": f"Bearer {cls.token}"
+        }
 
         if not all([cls.username, cls.password, cls.account_number]):
             raise unittest.SkipTest(
@@ -161,21 +171,188 @@ class TestSQLInjection(unittest.TestCase):
 
         injected_transactions = injected_response.json()["transactions"]
 
-        # Obtain unique transaction ids
-        normal_ids = {
+        # Injection should not return any transaction data
+        self.assertEqual(
+            injected_transactions, [],
+            "SQL Injection returned transaction data."
+        )
+
+    def test_transaction_union_sql_injection(self):
+        """Verifies UNION-based injection
+        cannot retrieve transaction records"""
+
+        # Attempt to retrieve all transactions
+        payload = (
+            "x' UNION SELECT id, from_account, to_account, "
+            "amount, timestamp, transaction_type, description "
+            "FROM transactions -- "
+        )
+
+        encoded_payload = quote(payload, safe="")
+
+        response = requests.get(
+            f"{BASE_URL}/transactions/{encoded_payload}",
+            timeout=10
+        )
+
+        # Injection should not expose transaction data
+        self.assertEqual(response.status_code, 200)
+
+        result = response.json()
+
+        self.assertEqual(
+            result["transactions"],
+            [],
+            "UNION-based SQL injection exposed transaction records."
+        )
+
+    def test_biller_id_numeric_sql_injection(self):
+        """Verifies numeric SQL injection cannot manipulate biller lookup"""
+
+        # Capture original account balance
+        balance_response = requests.get(
+            f"{BASE_URL}/check_balance/{self.account_number}",
+            timeout=10
+        )
+
+        self.assertEqual(balance_response.status_code, 200)
+        original_balance = balance_response.json()["balance"]
+
+        # Capture original transaction IDs
+        transaction_response = requests.get(
+            f"{BASE_URL}/transactions/{self.account_number}",
+            timeout=10
+        )
+
+        self.assertEqual(transaction_response.status_code, 200)
+
+        original_ids = {
             transaction["id"]
-            for transaction in normal_transactions
+            for transaction in transaction_response.json()["transactions"]
         }
 
-        injected_ids = {
+        # Attempt numeric SQL injection
+        response = requests.post(
+            f"{BASE_URL}/api/bill-payments/create",
+            headers=self.headers,
+            json={
+                "biller_id": "1 OR 1=1",
+                "amount": 1.00,
+                "payment_method": "balance"
+            },
+            timeout=10
+        )
+
+        # Malicious biller identifier should be rejected
+        self.assertIn(
+            response.status_code,
+            [400, 404, 422],
+            "Numeric SQL injection was not properly rejected"
+        )
+
+        # Verifies account balance remains unchanged
+        updated_balance = requests.get(
+            f"{BASE_URL}/check_balance/{self.account_number}",
+            timeout=10
+        ).json()["balance"]
+
+        self.assertEqual(
+            updated_balance,
+            original_balance,
+            "SQL injection modified the test account balance."
+        )
+
+        # Verify no addtional transactions were created
+        updated_transactions = requests.get(
+            f"{BASE_URL}/transactions/{self.account_nubmer}",
+            timeout=10
+        ).json()["transactions"]
+
+        updated_ids = {
             transaction["id"]
-            for transaction in injected_transactions
+            for transaction in updated_transactions
         }
 
-        # Injection should not expose real transactions
-        self.assertTrue(
-            injected_ids.issubset(normal_ids),
-            "SQL Injection exposed transactions outside of the test account."
+        self.assertEqual(
+            updated_ids,
+            original_ids,
+            "SQL injection created unauthorized transactions."
+        )
+
+    def test_transfer_sql_injection(self):
+        """Verifies malicious input cannot manipulate bank transfers"""
+
+        # Capture original account balance
+        balance_response = requests.get(
+            f"{BASE_URL}/check_balance/{self.account_number}",
+            timeout=10
+        )
+
+        self.assertEqual(balance_response.status_code, 200)
+
+        original_balance = balance_response.json()["balance"]
+
+        # Capture original transaction IDs
+        transaction_response = requests.get(
+            f"{BASE_URL}/transactions/{self.account_number}",
+            timeout=10
+        )
+
+        self.assertEqual(transaction_response.status_code, 200)
+
+        original_ids = {
+            transaction["id"]
+            for transaction in transaction_response.json()["transactions"]
+        }
+
+        # Attempt SQL injection through destination account
+        payload = "' OR '1'='1' -- "
+
+        response = requests.post(
+            f"{BASE_URL}/transfer",
+            headers=self.headers,
+            json={
+                "to_account": payload,
+                "amount": 1.00,
+                "description": "SQL inejction test"
+            },
+            timeout=10
+        )
+
+        # Malicious destination should be rejected
+        self.assertIn(
+            response.status_code,
+            [400, 404, 422],
+            "SQL injection resulted in an unsuccessful/unexpected response."
+        )
+
+        # Verify sender balance remains unchanged
+        updated_balance = requests.get(
+            f"{BASE_URL}/check_balance/{self.account_number}",
+            timeout=10
+        ).json()["balance"]
+
+        self.assertEqual(
+            updated_balance,
+            original_balance,
+            "SQL injection modified the sender's account balance."
+        )
+
+        # Verify no additional transactions were created
+        updated_transactions = requests.get(
+            f"{BASE_URL}/transactions/{self.account_number}",
+            timeout=10
+        ).json()["transactions"]
+
+        updated_ids = {
+            transaction["id"]
+            for transaction in updated_transactions
+        }
+
+        self.assertEqual(
+            updated_ids,
+            original_ids,
+            "SQL injection created an unauthorized transaction."
         )
 
 
