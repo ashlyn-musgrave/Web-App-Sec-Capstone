@@ -42,3 +42,26 @@
 **Recommended remediation:** Remove the insecure signature-verification fallback. Require a valid signature, enforce a strict algorithm allowlist, use a strong secret key, and validate token expiration. Administrator authorization should also be enforced server-side.
 
 **Conclusion:** BAC-02 failed its security assertion, demonstrating that VulnBank accepts forged JWTs containing unauthorized administrator claims. Additional endpoint-level testing would establish whether those claims permit access to administrator-only functionality.
+
+
+### BAC-03: Horizontal Privilege Escalation — Unauthorized Virtual Card Modification
+
+**Vulnerability:** Broken Access Control — Horizontal Privilege Escalation (Broken Object Level Authorization)
+
+**Affected Endpoint:** `/api/virtual-cards/<int:card_id>/toggle-freeze`
+
+**Testing Framework:** Python `unittest`
+
+**Test Methodology:** Two temporary customer accounts were created using an automated test-account helper. Customer B authenticated using a legitimate JWT and created a virtual card. Customer A then used their own valid JWT to submit a request to freeze Customer B's virtual card. The test recorded the card's original freeze status and queried the database afterward to determine whether the unauthorized modification was successful.
+
+**Expected Result:** The application should reject Customer A's attempt to modify Customer B's virtual card with an HTTP 403 or 404 response. The card's original freeze status should remain unchanged.
+
+**Actual Result:** The application returned HTTP 200, indicating that the unauthorized request was accepted. Database verification confirmed that Customer B's virtual card changed from unfrozen (`False`) to frozen (`True`). The unit test reported `FAILED (failures=1)`, demonstrating that the application failed to enforce the expected authorization restrictions.
+
+**Security Impact:** An authenticated attacker could potentially manipulate virtual cards belonging to other customers by supplying their card IDs. This could allow unauthorized freezing or unfreezing of another customer's cards, potentially disrupting financial transactions and account availability.
+
+**Root Cause:** The `toggle_card_freeze()` function updates the `virtual_cards` table using only the supplied `card_id`, without verifying that the card belongs to the authenticated user. Although the endpoint requires authentication, it does not enforce object-level authorization.
+
+**Recommended Remediation:** Implement server-side ownership verification before allowing virtual card modifications. The SQL update should validate both the requested card ID and the authenticated user's ID. Unauthorized requests should be rejected with an appropriate HTTP response, and the card's existing state should remain unchanged.
+
+**Conclusion:** BAC-03 successfully demonstrated a horizontal privilege escalation vulnerability in VulnBank. Customer A was able to modify Customer B's virtual card despite having no authorization to manage that resource. The failed security assertion, HTTP 200 response, and confirmed database modification provide evidence of broken object-level authorization.
