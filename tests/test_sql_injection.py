@@ -105,19 +105,35 @@ class TestSQLInjection(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_login_single_quote(self):
-        """Verifies special character handling"""
+        """Verifies special character (single quotes) handling"""
 
-        response = requests.post(
-            f"{BASE_URL}/login",
-            json={
+        test_cases = [
+            {
                 "username": "'",
-                "password": "'"
+                "password": self.password
             },
-            timeout=10
-        )
+            {
+                "username": self.username,
+                "password": "'"
+            }
+        ]
 
-        # Server error should not occur
-        self.assertNotEqual(response.status_code, 500)
+        for credentials in test_cases:
+            with self.subTest(credentials=credentials):
+                response = requests.post(
+                    f"{BASE_URL}/login",
+                    json=credentials,
+                    timeout=10
+                )
+
+                # Malformed credentials should not cause a server error
+                # or successfully authenticate.
+                self.assertIn(
+                    response.status_code,
+                    [400, 401, 422],
+                    f"Unexpected response to single-quote input: "
+                    f"{response.status_code} - {response.text}"
+                )
 
     def test_balance_sql_injection(self):
         """Verifies account number injection is unsuccessful"""
@@ -264,7 +280,7 @@ class TestSQLInjection(unittest.TestCase):
 
         # Verify no addtional transactions were created
         updated_transactions = requests.get(
-            f"{BASE_URL}/transactions/{self.account_nubmer}",
+            f"{BASE_URL}/transactions/{self.account_number}",
             timeout=10
         ).json()["transactions"]
 
